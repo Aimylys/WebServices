@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Live Products</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <h1>Produits en temps réel</h1>
+    <ul id="product-list"></ul>
+
+    <script>
+      const socket = io();
+
+      socket.on("products", (product) => {
+        const li = document.createElement("li");
+        li.id = product._id;
+        li.textContent = `${product.name} - ${product.price}€`;
+        document.getElementById("product-list").appendChild(li);
+      });
+
+      socket.on("product deleted", (productId) => {
+        const productElement = document.getElementById(productId);
+        if (productElement) {
+            productElement.remove(); 
+        }
+      });
+
+    </script>
+  </body>
+</html>

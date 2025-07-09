@@ -7,14 +7,35 @@ const port = 8000;
 const client = new MongoClient("mongodb://localhost:27017");
 let db;
 
-app.use(express.json());
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
+const server = http.createServer(app); 
+const io = new Server(server);
 
-client.connect().then(() => {
+app.use(express.json());
+// utilisé par le socket.io
+app.use(express.static(__dirname));
+
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+/*client.connect().then(() => {
   db = client.db("myDB");
   app.listen(port, () => {
     console.log(`Listening on http://localhost:${port}`);
   });
+});*/
+client.connect().then(() => {
+  db = client.db("myDB");
+
+  server.listen(port, () => {
+    console.log(`Listening on http://localhost:${port}`);
+  });
 });
+
 
 // Schemas
 const ProductSchema = z.object({
@@ -66,6 +87,15 @@ app.post("/products", async (req, res) => {
       .collection("products")
       .insertOne({ name, about, price, categoryIds: categoryObjectIds });
  
+
+    io.emit("products", {
+      _id: ack.insertedId,
+      name,
+      about,
+      price,
+      categoryIds: categoryObjectIds,
+    });
+
     res.send({
       _id: ack.insertedId,
       name,
@@ -77,6 +107,28 @@ app.post("/products", async (req, res) => {
     res.status(400).send(result);
   }
 });
+
+//DELETE
+app.delete("/products/:id", async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const product = await db.collection("products").findOne({ _id: new ObjectId(id) });
+
+    if (!product) {
+      return res.status(404).send({ message: "Produit non trouvé." });
+    }
+
+    await db.collection("products").deleteOne({ _id: new ObjectId(id) });
+
+    io.emit("product deleted", product._id.toString());
+    
+    res.send(product); // 👈 retourne les détails complets du produit supprimé
+  } catch (error) {
+    res.status(500).send({ error: "Erreur lors de la suppression.", details: error.message });
+  }
+});
+
 
 //POST
 app.post("/categories", async (req, res) => {
